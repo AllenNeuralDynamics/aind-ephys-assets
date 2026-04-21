@@ -6,13 +6,14 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-import zarr
 
 from aind_ephys_assets.zarr_io import (
     SIHeader,
     open_raw_traces,
     read_si_zarr_header,
 )
+
+from ._zarr_compat import create_array, open_group_w_v2
 
 
 def _make_si_zarr(
@@ -40,11 +41,11 @@ def _make_si_zarr(
         If False, the group has no ``traces_seg0`` (simulates a store
         that is a valid zarr group but not SI-format).
     """
-    grp = zarr.open_group(str(path), mode="w", zarr_format=2)
+    grp = open_group_w_v2(str(path))
     if sampling_frequency is not None:
         grp.attrs["sampling_frequency"] = sampling_frequency
     if include_traces:
-        arr = grp.create_array("traces_seg0", shape=shape, dtype=dtype)
+        arr = create_array(grp, "traces_seg0", shape=shape, dtype=dtype)
         arr[:] = np.arange(np.prod(shape), dtype=dtype).reshape(shape)
     return path
 

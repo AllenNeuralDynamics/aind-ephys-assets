@@ -8,7 +8,7 @@ resolution-markers = [
 
 [[package]]
 name = "aind-ephys-assets"
-version = "0.1.0"
+version = "0.3.0"
 source = { editable = "." }
 dependencies = [
     { name = "fsspec" },
@@ -47,7 +47,7 @@ types = [
 requires-dist = [
     { name = "fsspec" },
     { name = "s3fs", marker = "extra == 's3'" },
-    { name = "zarr", specifier = ">=3" },
+    { name = "zarr", specifier = ">=2.16" },
 ]
 provides-extras = ["s3"]
 

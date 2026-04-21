@@ -7,6 +7,7 @@ from aind_ephys_assets.discovery import (
     RawStreamSpec,
     discover_analyzers,
     discover_raw_streams,
+    find_nwb,
     find_raw_zarr,
 )
 from aind_ephys_assets.names import (
@@ -30,6 +31,7 @@ __all__ = [
     "discover_analyzers",
     "discover_raw_streams",
     "extract_device_name",
+    "find_nwb",
     "find_raw_zarr",
     "match_analyzer_to_raw",
     "open_raw_traces",

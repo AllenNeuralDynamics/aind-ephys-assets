@@ -7,6 +7,12 @@ This module provides a header reader for enumeration (``None`` on
 unreadable stores) and a strict opener for consumption (propagates
 errors).
 
+Supports both ``zarr>=3`` (which reads v2-format data via the
+``zarr_format=2`` kwarg on ``open_group``) and ``zarr>=2.16,<3`` (which
+only reads v2-format data, and doesn't have the newer
+``storage_options`` / ``zarr_format`` kwargs). Feature detection lives
+in :func:`_open_group_r`; call sites just use that helper.
+
 Codec-level perf tuning — e.g. ``traces.compressor.num_decoding_threads``
 for wavpack — is deliberately *not* applied here. It's a function of how
 the caller intends to consume the traces, not of the asset layout.
@@ -22,6 +28,41 @@ from typing import Any, cast
 import zarr
 
 __all__ = ["SIHeader", "open_raw_traces", "read_si_zarr_header"]
+
+
+# zarr 3.x changed the open_group signature (added ``zarr_format`` and
+# ``storage_options`` kwargs); on 2.x, neither kwarg exists and remote
+# URIs must be wrapped explicitly via ``zarr.storage.FSStore``. We pick
+# the right path at import time so the hot read path doesn't re-check.
+_ZARR_V3 = int(zarr.__version__.split(".", 1)[0]) >= 3
+
+
+def _open_group_r(
+    source: str,
+    storage_options: dict[str, Any] | None,
+) -> Any:
+    """Open a v2-format SI zarr for reading, portable across zarr 2.x and 3.x.
+
+    On zarr 3.x, passes ``zarr_format=2`` and forwards ``storage_options``
+    directly. On zarr 2.x (no ``zarr_format`` kwarg; reads v2 natively),
+    wraps ``s3://`` / ``gs://`` / ``http(s)://`` URIs (and any local path
+    with storage_options) in an explicit ``FSStore`` so ``storage_options``
+    reaches fsspec.
+    """
+    if _ZARR_V3:
+        return zarr.open_group(
+            source,
+            mode="r",
+            zarr_format=2,
+            storage_options=storage_options,
+        )
+    # zarr 2.x: no zarr_format kwarg (only reads v2 format anyway), and
+    # storage_options must go through FSStore rather than open_group.
+    is_uri = source.startswith(("s3://", "gs://", "az://", "http://", "https://"))
+    if is_uri or storage_options:
+        store: Any = zarr.storage.FSStore(source, **(storage_options or {}))
+        return zarr.open_group(store=store, mode="r")
+    return zarr.open_group(source, mode="r")
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,17 +115,12 @@ def read_si_zarr_header(
         AP vs LFP by threshold so zero is a safe "unknown" sentinel).
     """
     try:
-        grp = zarr.open_group(
-            _as_store_arg(source),
-            mode="r",
-            zarr_format=2,
-            storage_options=storage_options,
-        )
+        grp = _open_group_r(_as_store_arg(source), storage_options)
         # zarr's attrs.get and grp[key] are typed with permissive unions
         # (JSON-like / Array|Group); the SI format contract narrows them
         # to "number" and "Array", so casts are safe here.
         sf = float(cast(Any, grp.attrs.get("sampling_frequency", 0)))
-        traces = cast("zarr.Array[Any]", grp["traces_seg0"])
+        traces = cast(Any, grp["traces_seg0"])
         n_samples, n_channels = traces.shape
     except Exception:
         return None
@@ -126,12 +162,7 @@ def open_raw_traces(
     tuple
         ``(traces_seg0_array, sampling_frequency)``.
     """
-    grp = zarr.open_group(
-        _as_store_arg(source),
-        mode="r",
-        zarr_format=2,
-        storage_options=storage_options,
-    )
-    traces = cast("zarr.Array[Any]", grp["traces_seg0"])
+    grp = _open_group_r(_as_store_arg(source), storage_options)
+    traces = cast(Any, grp["traces_seg0"])
     sf = float(cast(Any, grp.attrs["sampling_frequency"]))
     return traces, sf

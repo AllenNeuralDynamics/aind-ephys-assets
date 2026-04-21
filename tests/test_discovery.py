@@ -6,16 +6,18 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-import zarr
 
 from aind_ephys_assets import discovery
 from aind_ephys_assets.discovery import (
     AnalyzerSpec,
     discover_analyzers,
     discover_raw_streams,
+    find_nwb,
     find_raw_zarr,
 )
 from aind_ephys_assets.zarr_io import SIHeader
+
+from ._zarr_compat import create_array, open_group_w_v2
 
 
 def _make_si_zarr(
@@ -25,9 +27,9 @@ def _make_si_zarr(
     shape: tuple[int, int] = (1024, 384),
     dtype: str = "int16",
 ) -> None:
-    grp = zarr.open_group(str(path), mode="w", zarr_format=2)
+    grp = open_group_w_v2(str(path))
     grp.attrs["sampling_frequency"] = sampling_frequency
-    arr = grp.create_array("traces_seg0", shape=shape, dtype=dtype)
+    arr = create_array(grp, "traces_seg0", shape=shape, dtype=dtype)
     arr[:] = np.zeros(shape, dtype=dtype)
 
 
@@ -36,7 +38,7 @@ def _make_analyzer_zarr(path: Path) -> None:
     root — they're SortingAnalyzer containers.  For discover_analyzers's
     purposes only the presence of ``.zarr`` dirs matters; we don't open
     them as SI stores."""
-    grp = zarr.open_group(str(path), mode="w", zarr_format=2)
+    grp = open_group_w_v2(str(path))
     grp.attrs["dummy"] = True
 
 
@@ -78,7 +80,7 @@ class TestDiscoverRawStreamsLocal:
         # returns None; discovery silently skips so one corrupt store
         # doesn't break enumeration for the asset as a whole.
         bad = tmp_path / "bad.zarr"
-        grp = zarr.open_group(str(bad), mode="w", zarr_format=2)
+        grp = open_group_w_v2(str(bad))
         grp.attrs["sampling_frequency"] = 30_000.0
         streams = discover_raw_streams(tmp_path)
         assert [s.name for s in streams] == ["good.zarr"]
@@ -316,3 +318,42 @@ class TestFindRawZarr:
         raw.mkdir()
         (raw / "foo.zarr").mkdir()
         assert find_raw_zarr(str(tmp_path), "foo_recording1") == raw / "foo.zarr"
+
+
+class TestFindNwb:
+    def test_flat_layout(self, tmp_path: Path):
+        nwb = tmp_path / "session.nwb"
+        nwb.write_bytes(b"not a real nwb, just a marker")
+        assert find_nwb(tmp_path) == nwb
+
+    def test_nested_layout(self, tmp_path: Path):
+        nested = tmp_path / "asset" / "ecephys"
+        nested.mkdir(parents=True)
+        nwb = nested / "session.nwb"
+        nwb.write_bytes(b"marker")
+        assert find_nwb(tmp_path) == nwb
+
+    def test_missing_returns_none(self, tmp_path: Path):
+        # Empty dir, other files — still no NWB.
+        (tmp_path / "notes.txt").write_text("hi")
+        assert find_nwb(tmp_path) is None
+
+    def test_follows_symlinks(self, tmp_path: Path):
+        # Simulate CO's pipeline staging, which bind-mounts assets under
+        # /tmp and symlinks them into /data. Without followlinks, a naive
+        # recursion would miss the NWB entirely.
+        real = tmp_path / "real_asset"
+        real.mkdir()
+        nwb = real / "session.nwb"
+        nwb.write_bytes(b"marker")
+        link = tmp_path / "data" / "asset_link"
+        link.parent.mkdir()
+        link.symlink_to(real, target_is_directory=True)
+        found = find_nwb(tmp_path / "data")
+        assert found is not None
+        assert found.name == "session.nwb"
+
+    def test_accepts_str(self, tmp_path: Path):
+        nwb = tmp_path / "session.nwb"
+        nwb.write_bytes(b"marker")
+        assert find_nwb(str(tmp_path)) == nwb

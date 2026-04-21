@@ -13,11 +13,11 @@ authors = [
 ]
 classifiers = ["Programming Language :: Python :: 3"]
 readme = "README.md"
-version = "0.2.0"
+version = "0.3.0"
 
 dependencies = [
     "fsspec",
-    "zarr>=3",
+    "zarr>=2.16",
 ]
 
 [project.optional-dependencies]

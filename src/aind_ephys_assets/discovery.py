@@ -27,6 +27,7 @@ __all__ = [
     "RawStreamSpec",
     "discover_analyzers",
     "discover_raw_streams",
+    "find_nwb",
     "find_raw_zarr",
 ]
 
@@ -249,4 +250,38 @@ def find_raw_zarr(data_dir: str | Path, recording_name: str) -> Path | None:
     for dirpath, dirs, _files in os.walk(root, followlinks=True):
         if Path(dirpath).name == "ecephys_compressed" and target in dirs:
             return Path(dirpath) / target
+    return None
+
+
+def find_nwb(data_dir: str | Path) -> Path | None:
+    """Locate the first ``*.nwb`` file under *data_dir*.
+
+    Walks recursively and follows symlinks so Code Ocean pipeline stage
+    mounts (bind-mounted via ``/tmp`` symlinks) are traversed. Returns
+    the first match in walk order — sufficient for AIND sessions which
+    typically have exactly one NWB file per mounted asset. Callers that
+    need every NWB (multi-session assets) should walk themselves.
+
+    Parameters
+    ----------
+    data_dir : str or Path
+        Directory to search. Typically ``/data`` on Code Ocean.
+
+    Returns
+    -------
+    Path or None
+        Path to the first ``*.nwb`` file found, or ``None`` if none
+        exist under *data_dir*.
+
+    Notes
+    -----
+    This helper finds the file; it does **not** open or parse it.
+    Downstream consumers (pynwb, hdmf-zarr) need those deps themselves;
+    ``aind-ephys-assets`` stays lean on purpose.
+    """
+    root = Path(str(data_dir))
+    for dirpath, _dirs, files in os.walk(root, followlinks=True):
+        for name in files:
+            if name.endswith(".nwb"):
+                return Path(dirpath) / name
     return None
