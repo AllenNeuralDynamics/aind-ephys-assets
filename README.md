@@ -8,27 +8,70 @@
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
 [![Copier](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/copier-org/copier/master/img/badge/badge-grayscale-inverted-border.json)](https://github.com/copier-org/copier)
 
-AIND ephys asset layout knowledge and helpers
+AIND ephys asset layout knowledge and helpers — stream discovery, path
+resolution, and name parsing for capsules that consume AIND raw +
+sorted electrophysiology assets. Pure filesystem / S3 structure
+reasoning; does not wrap SpikeInterface, does not build mipmaps.
 
 ## Installation
 
-If you choose to clone the repository, you can install the package by running the following command from the root directory of the repository:
-
 ```bash
-pip install .
+pip install aind-ephys-assets          # local paths only
+pip install 'aind-ephys-assets[s3]'    # adds s3fs for s3:// paths
 ```
 
-Otherwise, you can use pip:
+Or from a clone:
 
 ```bash
-pip install aind-ephys-assets
+pip install .            # or `pip install '.[s3]'`
+uv sync                  # dev
 ```
 
+## Usage
 
+```python
+from aind_ephys_assets import (
+    discover_raw_streams,
+    discover_analyzers,
+    resolve_raw_root,
+    resolve_sort_root,
+    find_raw_zarr,
+)
 
-To develop the code, run:
-```bash
-uv sync
+# Enumerate raw AP/LFP streams (local or s3://).  Auto-descends into
+# ecephys/ecephys_compressed/ when the caller passes the asset root.
+streams = discover_raw_streams("/data/raw_asset")
+for s in streams:
+    print(s.name, s.sampling_frequency, s.n_channels)
+
+# Enumerate sorted analyzers and map each to its raw counterpart.
+analyzers = discover_analyzers(
+    "/data/sorted_asset",
+    raw_root="s3://my-bucket/raw_asset/ecephys/ecephys_compressed",
+)
+for a in analyzers:
+    print(a.name, "→ raw:", a.raw_path)
+
+# S3 with anonymous auth (e.g. AIND Open Data):
+streams = discover_raw_streams(
+    "s3://aind-open-data/ecephys_...",
+    storage_options={"anon": True},
+)
+
+# Stand-alone helpers
+from aind_ephys_assets import (
+    extract_device_name,
+    match_analyzer_to_raw,
+    sanitize_stream_name,
+    read_si_zarr_header,
+    open_raw_traces,
+)
+
+assert match_analyzer_to_raw("foo_recording1.zarr") == "foo.zarr"
+assert extract_device_name("..._Neuropix-PXI-100.50213-1_recording1") == "50213-1"
+
+header = read_si_zarr_header("/path/to/stream.zarr")
+traces, sf = open_raw_traces("/path/to/stream.zarr")
 ```
 
 ## Development

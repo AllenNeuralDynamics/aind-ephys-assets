@@ -47,3 +47,32 @@ This is a Python package using a `src/` layout. Source code lives in `src/aind_e
 - Type checking: mypy (strict mode)
 - Versioning: commitizen (semantic versioning via conventional commits)
 - CLI entry points: defined in `[project.scripts]` in pyproject.toml, implemented in `src/aind_ephys_assets/scripts/`
+
+## Scope
+
+AIND ephys asset **layout knowledge** — stream discovery, path resolution, name
+parsing — shared across capsules that consume AIND raw + sorted assets. Pure
+filesystem / S3 structure reasoning.
+
+**Non-goals**: not a SpikeInterface wrapper (we read SI-format zarrs directly,
+no `si.load` / object-graph construction), not a mipmap helper (consumed by
+`ecephys-mipmap-zarr`, not vice versa), not a metadata client (no
+`aind-data-schema` / `aind-data-access-api`).
+
+**Source capsules** being de-duplicated:
+- `~/Documents/Code/ecephys-mipmap-builder-capsule/code/run_capsule.py`
+- `~/Documents/Code/ccg-analysis-monorepo/pl-oversplitting-analysis-capsule/code/data_discovery.py`
+
+## AIND layout gotchas (canonical reference)
+
+- Raw assets may be passed at the root or already descended into
+  `ecephys/ecephys_compressed/` — `resolve_raw_root` must handle both.
+- Sort assets may be passed at their root (contains `postprocessed/`) or one
+  level above (pipeline-mounted layouts nest under `<asset_name>/`) —
+  `resolve_sort_root` descends one level before giving up.
+- Analyzer zarrs live at `postprocessed/<name>_recording<N>.zarr`; the matching
+  raw zarr is `ecephys_compressed/<name>.zarr` (no `_recording<N>` suffix).
+- Stream names like `experiment1_Record Node 111#Neuropix-PXI-100.50213-1`
+  contain spaces, `#`, and `.` — sanitize before using as a filesystem basename.
+- CO pipeline workers stage mounts via `/tmp` symlinks — use
+  `os.walk(followlinks=True)`, not `Path.rglob`, when traversing `/data`.

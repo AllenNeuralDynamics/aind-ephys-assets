@@ -16,7 +16,12 @@ readme = "README.md"
 version = "0.1.0"
 
 dependencies = [
+    "fsspec",
+    "zarr>=3",
 ]
+
+[project.optional-dependencies]
+s3 = ["s3fs"]
 
 [project.urls]
 Repository = "https://github.com/AllenNeuralDynamics/aind-ephys-assets/"
@@ -87,4 +92,8 @@ exclude = ["scratch"]
 module = "tests.*"
 disallow_untyped_defs = false
 disallow_incomplete_defs = false
+
+[[tool.mypy.overrides]]
+module = ["fsspec", "fsspec.*"]
+ignore_missing_imports = true
 
