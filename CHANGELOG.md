@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.4.0 (2026-04-23)
+
+### Fix
+
+- `find_nwb` now matches Zarr NWB directories (e.g.
+  `session.nwb/` with zarr chunks, read via
+  `hdmf-zarr.NWBZarrIO`), not just HDF5 `*.nwb` files. Previously
+  directory-format NWB assets mounted under `/data` were silently
+  skipped and callers got `nwb_path=None`. Files are still preferred
+  over directories when both exist in the same parent, so we never
+  descend into a `.nwb` directory looking for a nested file.
+
 ## v0.3.0 (2026-04-21)
 
 ### Feat

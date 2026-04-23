@@ -357,3 +357,29 @@ class TestFindNwb:
         nwb = tmp_path / "session.nwb"
         nwb.write_bytes(b"marker")
         assert find_nwb(str(tmp_path)) == nwb
+
+    def test_zarr_nwb_directory(self, tmp_path: Path):
+        # AIND's newer pipeline writes NWB in Zarr format: the .nwb is a
+        # directory of chunks (read by hdmf_zarr.NWBZarrIO), not a file.
+        nwb_dir = tmp_path / "session.nwb"
+        nwb_dir.mkdir()
+        (nwb_dir / ".zgroup").write_text("{}")  # typical zarr marker
+        assert find_nwb(tmp_path) == nwb_dir
+
+    def test_nested_zarr_nwb_directory(self, tmp_path: Path):
+        # Asset wrappers like /data/<mount>/<session>.nwb/ — the walk
+        # must reach the nested directory, not bail at the top level.
+        asset = tmp_path / "asset_mount"
+        asset.mkdir()
+        nwb_dir = asset / "session.nwb"
+        nwb_dir.mkdir()
+        assert find_nwb(tmp_path) == nwb_dir
+
+    def test_file_preferred_over_directory(self, tmp_path: Path):
+        # When both forms live in the same parent, prefer the file —
+        # otherwise we'd risk descending into a .nwb directory looking
+        # for a file inside and never returning the sibling.
+        nwb_file = tmp_path / "a.nwb"
+        nwb_file.write_bytes(b"marker")
+        (tmp_path / "b.nwb").mkdir()
+        assert find_nwb(tmp_path) == nwb_file

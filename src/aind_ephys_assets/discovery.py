@@ -254,13 +254,20 @@ def find_raw_zarr(data_dir: str | Path, recording_name: str) -> Path | None:
 
 
 def find_nwb(data_dir: str | Path) -> Path | None:
-    """Locate the first ``*.nwb`` file under *data_dir*.
+    """Locate the first ``*.nwb`` entry under *data_dir*.
 
     Walks recursively and follows symlinks so Code Ocean pipeline stage
     mounts (bind-mounted via ``/tmp`` symlinks) are traversed. Returns
     the first match in walk order — sufficient for AIND sessions which
-    typically have exactly one NWB file per mounted asset. Callers that
+    typically have exactly one NWB per mounted asset. Callers that
     need every NWB (multi-session assets) should walk themselves.
+
+    Matches both files and directories ending in ``.nwb``: the classic
+    HDF5 NWB is a single file, while Zarr NWB (produced by newer AIND
+    pipelines and read via ``hdmf-zarr.NWBZarrIO``) is a directory of
+    chunks. When both forms coexist in a subtree the file is preferred
+    so we don't descend into a ``.nwb`` directory looking for a second
+    ``.nwb`` file inside it.
 
     Parameters
     ----------
@@ -270,18 +277,21 @@ def find_nwb(data_dir: str | Path) -> Path | None:
     Returns
     -------
     Path or None
-        Path to the first ``*.nwb`` file found, or ``None`` if none
-        exist under *data_dir*.
+        Path to the first ``*.nwb`` entry found (file or directory),
+        or ``None`` if none exist under *data_dir*.
 
     Notes
     -----
-    This helper finds the file; it does **not** open or parse it.
+    This helper finds the entry; it does **not** open or parse it.
     Downstream consumers (pynwb, hdmf-zarr) need those deps themselves;
     ``aind-ephys-assets`` stays lean on purpose.
     """
     root = Path(str(data_dir))
-    for dirpath, _dirs, files in os.walk(root, followlinks=True):
+    for dirpath, dirs, files in os.walk(root, followlinks=True):
         for name in files:
+            if name.endswith(".nwb"):
+                return Path(dirpath) / name
+        for name in dirs:
             if name.endswith(".nwb"):
                 return Path(dirpath) / name
     return None
