@@ -60,7 +60,9 @@ def _open_group_r(
     # storage_options must go through FSStore rather than open_group.
     is_uri = source.startswith(("s3://", "gs://", "az://", "http://", "https://"))
     if is_uri or storage_options:
-        store: Any = zarr.storage.FSStore(source, **(storage_options or {}))
+        # getattr: FSStore exists only in zarr 2, and mypy checks against zarr 3's stubs.
+        fs_store = getattr(zarr.storage, "FSStore")
+        store: Any = fs_store(source, **(storage_options or {}))
         return zarr.open_group(store=store, mode="r")
     return zarr.open_group(source, mode="r")
 
