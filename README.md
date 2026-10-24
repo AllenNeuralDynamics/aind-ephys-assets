@@ -18,6 +18,7 @@ reasoning; does not wrap SpikeInterface, does not build mipmaps.
 ```bash
 pip install aind-ephys-assets          # local paths only
 pip install 'aind-ephys-assets[s3]'    # adds s3fs for s3:// paths
+pip install 'aind-ephys-assets[si]'    # adds SpikeInterface for load_motion / correct_recording
 ```
 
 Or from a clone:
@@ -73,6 +74,24 @@ assert extract_device_name("..._Neuropix-PXI-100.50213-1_recording1") == "50213-
 header = read_si_zarr_header("/path/to/stream.zarr")
 traces, sf = open_raw_traces("/path/to/stream.zarr")
 ```
+
+### Drift estimates
+
+A sorted asset saves Kilosort 4's applied estimate (`spikesorted/motion/<recording>/`, opposite
+sign to SpikeInterface) and preprocessing's unapplied `dredge_fast`
+(`preprocessed/motion/<recording>/motion/`). Both come back in SpikeInterface's sign; there is no
+fallback from one to the other.
+
+```python
+from aind_ephys_assets import read_motion, load_motion, correct_recording
+
+m = read_motion(sort_root, analyzer_name)              # numpy only
+motion, info = load_motion(sort_root, analyzer_name, recording)   # [si]: Motion on the recording's clock
+corrected = correct_recording(recording, motion)        # [si]: float32, kriging, all channels kept
+```
+
+SpikeInterface pins `zarr<3` below Python 3.14, so its tests run outside the default zarr 3
+environment: `uv run --extra si --no-group zarr3 pytest`.
 
 ## Development
 

@@ -17,11 +17,16 @@ version = "0.4.0"
 
 dependencies = [
     "fsspec",
+    "numpy>=1.24",
     "zarr>=2.16",
 ]
 
 [project.optional-dependencies]
 s3 = ["s3fs"]
+si = [
+    "scipy>=1.10",
+    "spikeinterface>=0.104",
+]
 
 [project.urls]
 Repository = "https://github.com/AllenNeuralDynamics/aind-ephys-assets/"
@@ -36,6 +41,12 @@ Changelog = "https://github.com/AllenNeuralDynamics/aind-ephys-assets/blob/main/
 types = ["mypy"]
 dev = [{ include-group = "types" }, "codespell", "pytest", "pytest-cov", "ruff", "interrogate"]
 jupyter = [{ include-group = "dev" }, "ipykernel", "pip"]
+# SpikeInterface pins zarr<3 below Python 3.14; without this group the dev env would never test zarr 3.
+zarr3 = ["zarr>=3"]
+
+[tool.uv]
+default-groups = ["dev", "zarr3"]
+conflicts = [[{ extra = "si" }, { group = "zarr3" }]]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/aind_ephys_assets"]
@@ -97,3 +108,6 @@ disallow_incomplete_defs = false
 module = ["fsspec", "fsspec.*"]
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+module = ["spikeinterface", "spikeinterface.*", "scipy", "scipy.*"]
+ignore_missing_imports = true

@@ -10,6 +10,15 @@ from aind_ephys_assets.discovery import (
     find_nwb,
     find_raw_zarr,
 )
+from aind_ephys_assets.motion import (
+    MotionSource,
+    SavedMotion,
+    align_bins,
+    correct_recording,
+    load_motion,
+    motion_folder,
+    read_motion,
+)
 from aind_ephys_assets.names import (
     extract_device_name,
     match_analyzer_to_raw,
@@ -25,16 +34,23 @@ except PackageNotFoundError:
 
 __all__ = [
     "AnalyzerSpec",
+    "MotionSource",
     "RawStreamSpec",
     "SIHeader",
+    "SavedMotion",
     "__version__",
+    "align_bins",
+    "correct_recording",
     "discover_analyzers",
     "discover_raw_streams",
     "extract_device_name",
     "find_nwb",
     "find_raw_zarr",
+    "load_motion",
     "match_analyzer_to_raw",
+    "motion_folder",
     "open_raw_traces",
+    "read_motion",
     "read_si_zarr_header",
     "resolve_raw_root",
     "resolve_sort_root",
